@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FloralBot - Flower Recognition System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <img src="images/floralbot-logo.png" alt="FloralBot Logo">
+                <h1>FloralBot</h1>
+            </div>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <h2>Upload or Take a Photo of Flowers</h2>
+                <div class="input-buttons">
+                    <input type="file" id="fileInput" accept="image/*" class="hidden">
+                    <button id="uploadBtn" class="btn">Upload Photo</button>
+                    <button id="cameraBtn" class="btn">Take Photo</button>
+                </div>
+                <video id="camera" class="hidden"></video>
+                <canvas id="canvas" class="hidden"></canvas>
+            </div>
+
+            <div class="results-section hidden">
+                <h2>Analysis Results</h2>
+                <div class="results-container">
+                    <div class="image-preview">
+                        <img id="previewImage" alt="Uploaded flower image">
+                    </div>
+                    <div class="analysis-results">
+                        <h3>Detected Flowers:</h3>
+                        <div id="flowerResults"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html> 
