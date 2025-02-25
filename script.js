@@ -75,8 +75,8 @@ class FloralBot {
 
     async analyzeImage(base64Image) {
         // Replace with your Azure Vision API endpoint and key
-        const endpoint = 'YOUR_AZURE_VISION_ENDPOINT';
-        const apiKey = 'YOUR_AZURE_VISION_API_KEY';
+        const endpoint = 'https://lab007-sailscan.cognitiveservices.azure.com/';
+        const apiKey = 'GL77pStrB7FFP0mkN0K8AQgGh9je5DBmk8D8afb8bEDKacOZ9Mb8JQQJ99BBACYeBjFXJ3w3AAAFACOGCb85';
 
         try {
             const response = await fetch(`${endpoint}/vision/v3.2/analyze?features=Objects,Color`, {
