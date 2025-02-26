@@ -29,9 +29,20 @@ class FloralBot {
             }
             this.config = await response.json();
             
+            console.log('Client received config:', {
+                storageAccount: this.config.STORAGE_ACCOUNT ? 'Present' : 'Missing',
+                container: this.config.STORAGE_CONTAINER ? 'Present' : 'Missing',
+                sasToken: this.config.SAS_TOKEN ? 'Present' : 'Missing',
+                visionEndpoint: this.config.VISION_ENDPOINT ? 'Present' : 'Missing',
+                visionApiKey: this.config.VISION_API_KEY ? 'Present' : 'Missing'
+            });
+
             // Validate config
             if (!this.config.STORAGE_ACCOUNT || !this.config.STORAGE_CONTAINER || !this.config.SAS_TOKEN) {
-                throw new Error('Missing required storage configuration');
+                throw new Error(`Missing required storage configuration:
+                    Storage Account: ${this.config.STORAGE_ACCOUNT ? 'Present' : 'Missing'}
+                    Container: ${this.config.STORAGE_CONTAINER ? 'Present' : 'Missing'}
+                    SAS Token: ${this.config.SAS_TOKEN ? 'Present' : 'Missing'}`);
             }
             if (!this.config.VISION_ENDPOINT || !this.config.VISION_API_KEY) {
                 throw new Error('Missing required Vision API configuration');
