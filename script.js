@@ -171,20 +171,19 @@ class FloralBot {
     async analyzeImage(base64Image) {
         try {
             this.visionDebug.textContent = 'Sending request to Azure Vision API...';
-            const response = await fetch(`${this.config.VISION_ENDPOINT}/vision/v3.2/analyze`, {
+            // First, analyze with general features
+            const response = await fetch(`${this.config.VISION_ENDPOINT}/vision/v3.2/analyze?${new URLSearchParams({
+                'visualFeatures': 'Categories,Tags,Description,Objects,Color',
+                'details': 'Landmarks,Categories',
+                'language': 'en',
+                'model-version': 'latest'
+            })}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/octet-stream',
                     'Ocp-Apim-Subscription-Key': this.config.VISION_API_KEY
                 },
-                body: this.base64ToBlob(base64Image),
-                query: {
-                    'visualFeatures': 'Objects,Color,Description,Tags',
-                    'language': 'en',
-                    'model-version': 'latest',
-                    'detail': 'high',
-                    'description': 'This is an image of flowers. Please identify the types of flowers, count of each flower type, and their colors.'
-                }
+                body: this.base64ToBlob(base64Image)
             });
 
             if (!response.ok) {
@@ -192,19 +191,48 @@ class FloralBot {
             }
 
             const data = await response.json();
-            this.visionDebug.textContent = 'API Response:\n' + JSON.stringify(data, null, 2);
-            
+            // Log full API response for debugging
+            this.visionDebug.textContent = 'Raw Vision API Response:\n' + 
+                JSON.stringify(data, null, 2) + '\n\n';
+
             // Process the results to identify flowers
             const flowerAnalysis = {
                 flowers: [],
                 colors: data.color?.dominantColors || [],
                 description: data.description?.captions?.[0]?.text || '',
+                rawTags: data.tags || [],
+                categories: data.categories || [],
+                objects: data.objects || [],
                 confidence: 0
             };
 
+            // Log detailed analysis steps
+            this.visionDebug.textContent += 'Analysis Steps:\n';
+            this.visionDebug.textContent += '1. Checking image categories...\n';
+            
+            // Check categories for nature/plant related items
+            if (data.categories) {
+                data.categories.forEach(category => {
+                    if (category.name.includes('plant') || 
+                        category.name.includes('flower') || 
+                        category.name.includes('outdoor_') ||
+                        category.name.includes('garden')) {
+                        this.visionDebug.textContent += 
+                            `Found category: ${category.name} (${(category.score * 100).toFixed(1)}%)\n`;
+                    }
+                });
+            }
+
+            this.visionDebug.textContent += '\n2. Analyzing tags...\n';
             // Check tags for flower-related items
             if (data.tags) {
                 data.tags.forEach(tag => {
+                    // Log all plant-related tags
+                    if (tag.confidence > 0.5) {
+                        this.visionDebug.textContent += 
+                            `Found tag: ${tag.name} (${(tag.confidence * 100).toFixed(1)}%)\n`;
+                    }
+
                     if (tag.name.includes('flower') || 
                         tag.name.includes('rose') || 
                         tag.name.includes('tulip') || 
@@ -213,7 +241,16 @@ class FloralBot {
                         tag.name.includes('orchid') ||
                         tag.name.includes('sunflower') ||
                         tag.name.includes('iris') ||
-                        tag.name.includes('peony')) {
+                        tag.name.includes('peony') ||
+                        tag.name.includes('plant') ||
+                        tag.name.includes('garden') ||
+                        tag.name.includes('petal') ||
+                        tag.name.includes('bloom') ||
+                        tag.name.includes('bouquet') ||
+                        tag.name.includes('floral') ||
+                        tag.name.includes('chrysanthemum') ||
+                        tag.name.includes('dahlia') ||
+                        tag.name.includes('carnation')) {
                         flowerAnalysis.flowers.push({
                             type: tag.name,
                             confidence: tag.confidence
@@ -222,16 +259,43 @@ class FloralBot {
                 });
             }
 
+            this.visionDebug.textContent += '\n3. Checking detected objects...\n';
             // Check objects for additional flower detections
             if (data.objects) {
                 data.objects.forEach(obj => {
+                    this.visionDebug.textContent += 
+                        `Found object: ${obj.object} (${(obj.confidence * 100).toFixed(1)}%)\n`;
+                    
                     if (obj.object.toLowerCase().includes('flower') ||
-                        obj.object.toLowerCase().includes('bouquet')) {
+                        obj.object.toLowerCase().includes('bouquet') ||
+                        obj.object.toLowerCase().includes('plant') ||
+                        obj.object.toLowerCase().includes('vase')) {
                         flowerAnalysis.flowers.push({
                             type: obj.object,
                             confidence: obj.confidence
                         });
                     }
+                });
+            }
+
+            // Add color analysis debug
+            this.visionDebug.textContent += '\n4. Analyzing colors...\n';
+            if (data.color) {
+                this.visionDebug.textContent += 
+                    `Dominant colors: ${data.color.dominantColors.join(', ')}\n`;
+                this.visionDebug.textContent += 
+                    `Accent color: ${data.color.accentColor}\n`;
+                if (data.color.isBWImg) {
+                    this.visionDebug.textContent += 'Image is black and white\n';
+                }
+            }
+
+            // Add caption/description debug
+            this.visionDebug.textContent += '\n5. Natural language description:\n';
+            if (data.description && data.description.captions) {
+                data.description.captions.forEach(caption => {
+                    this.visionDebug.textContent += 
+                        `Caption: ${caption.text} (${(caption.confidence * 100).toFixed(1)}%)\n`;
                 });
             }
 
