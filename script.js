@@ -74,22 +74,48 @@ class FloralBot {
     }
 
     async analyzeImage(base64Image) {
-        // Replace with your Azure Vision API endpoint and key
-        const endpoint = 'https://lab007-sailscan.cognitiveservices.azure.com/';
-        const apiKey = 'GL77pStrB7FFP0mkN0K8AQgGh9je5DBmk8D8afb8bEDKacOZ9Mb8JQQJ99BBACYeBjFXJ3w3AAAFACOGCb85';
-
         try {
-            const response = await fetch(`${endpoint}/vision/v3.2/analyze?features=Objects,Color`, {
+            const response = await fetch(`${this.visionEndpoint}/vision/v3.2/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/octet-stream',
-                    'Ocp-Apim-Subscription-Key': apiKey
+                    'Ocp-Apim-Subscription-Key': this.visionApiKey
                 },
-                body: this.base64ToBlob(base64Image)
+                body: this.base64ToBlob(base64Image),
+                params: {
+                    'visualFeatures': 'Objects,Color,Description,Tags',
+                    'language': 'en',
+                    'model-version': 'latest'
+                }
             });
 
             const data = await response.json();
-            this.displayResults(data);
+            
+            // Process the results to identify flowers
+            const flowerAnalysis = {
+                flowers: [],
+                colors: data.color.dominantColors,
+                confidence: 0
+            };
+
+            // Check tags for flower-related items
+            if (data.tags) {
+                data.tags.forEach(tag => {
+                    if (tag.name.includes('flower') || 
+                        tag.name.includes('rose') || 
+                        tag.name.includes('tulip') || 
+                        tag.name.includes('daisy') ||
+                        tag.name.includes('lily')) {
+                        flowerAnalysis.flowers.push({
+                            type: tag.name,
+                            confidence: tag.confidence
+                        });
+                    }
+                });
+            }
+
+            // Update the display with detailed results
+            this.displayResults(flowerAnalysis);
         } catch (error) {
             console.error('Error analyzing image:', error);
             this.flowerResults.innerHTML = 'Error analyzing image. Please try again.';
@@ -105,22 +131,41 @@ class FloralBot {
         return new Blob([bytes], { type: 'application/octet-stream' });
     }
 
-    displayResults(data) {
-        // Process and display the results
-        // This is a placeholder - you'll need to customize this based on the actual Azure Vision API response
-        let resultsHtml = '<ul>';
-        data.objects.forEach(obj => {
-            if (obj.object.toLowerCase().includes('flower')) {
+    displayResults(analysis) {
+        let resultsHtml = '<div class="analysis-details">';
+        
+        // Display detected flowers
+        if (analysis.flowers.length > 0) {
+            resultsHtml += '<h4>Detected Flowers:</h4><ul>';
+            analysis.flowers.forEach(flower => {
                 resultsHtml += `
                     <li>
-                        <strong>Type:</strong> ${obj.object}
+                        <strong>Type:</strong> ${flower.type.charAt(0).toUpperCase() + flower.type.slice(1)}
                         <br>
-                        <strong>Confidence:</strong> ${(obj.confidence * 100).toFixed(2)}%
+                        <strong>Confidence:</strong> ${(flower.confidence * 100).toFixed(1)}%
                     </li>
                 `;
-            }
-        });
-        resultsHtml += '</ul>';
+            });
+            resultsHtml += '</ul>';
+        } else {
+            resultsHtml += '<p>No specific flowers detected in the image.</p>';
+        }
+
+        // Display colors
+        if (analysis.colors && analysis.colors.length > 0) {
+            resultsHtml += '<h4>Dominant Colors:</h4><ul>';
+            analysis.colors.forEach(color => {
+                resultsHtml += `
+                    <li>
+                        <span class="color-swatch" style="background-color: ${color.toLowerCase()}"></span>
+                        ${color}
+                    </li>
+                `;
+            });
+            resultsHtml += '</ul>';
+        }
+
+        resultsHtml += '</div>';
         this.flowerResults.innerHTML = resultsHtml;
     }
 
