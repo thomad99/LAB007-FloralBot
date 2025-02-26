@@ -33,6 +33,7 @@ class FloralBot {
                 storageAccount: this.config.STORAGE_ACCOUNT ? 'Present' : 'Missing',
                 container: this.config.STORAGE_CONTAINER ? 'Present' : 'Missing',
                 sasToken: this.config.SAS_TOKEN ? 'Present' : 'Missing',
+                actualSasToken: this.config.SAS_TOKEN, // Temporarily log for debugging
                 visionEndpoint: this.config.VISION_ENDPOINT ? 'Present' : 'Missing',
                 visionApiKey: this.config.VISION_API_KEY ? 'Present' : 'Missing'
             });
@@ -42,7 +43,8 @@ class FloralBot {
                 throw new Error(`Missing required storage configuration:
                     Storage Account: ${this.config.STORAGE_ACCOUNT ? 'Present' : 'Missing'}
                     Container: ${this.config.STORAGE_CONTAINER ? 'Present' : 'Missing'}
-                    SAS Token: ${this.config.SAS_TOKEN ? 'Present' : 'Missing'}`);
+                    SAS Token: ${this.config.SAS_TOKEN ? 'Present' : 'Missing'}
+                    SAS Token value: ${this.config.SAS_TOKEN || 'undefined'}`);
             }
             if (!this.config.VISION_ENDPOINT || !this.config.VISION_API_KEY) {
                 throw new Error('Missing required Vision API configuration');
@@ -54,7 +56,10 @@ class FloralBot {
                     container: this.config.STORAGE_CONTAINER,
                     visionEndpoint: this.config.VISION_ENDPOINT?.substring(0, 30) + '...',
                     hasApiKey: !!this.config.VISION_API_KEY,
-                    hasSasToken: !!this.config.SAS_TOKEN
+                    hasSasToken: !!this.config.SAS_TOKEN,
+                    sasTokenLength: this.config.SAS_TOKEN?.length,
+                    sasTokenStart: this.config.SAS_TOKEN?.substring(0, 20) + '...',
+                    sasTokenValid: this.config.SAS_TOKEN?.startsWith('?')
                 }, null, 2);
         } catch (error) {
             console.error('Error loading configuration:', error);
@@ -269,7 +274,7 @@ class FloralBot {
     async uploadToBlob(file, blobName) {
         this.storageDebug.textContent = `Preparing to upload ${file.name} to blob storage...`;
         const baseUrl = `https://${this.config.STORAGE_ACCOUNT}.blob.core.windows.net/${this.config.STORAGE_CONTAINER}/${blobName}`;
-        this.storageDebug.textContent += `\nTarget URL: ${baseUrl}`;
+        this.storageDebug.textContent += `\nTarget URL: ${baseUrl}\nSAS Token starts with: ${this.config.SAS_TOKEN?.substring(0, 10)}...`;
         
         const blobUrl = baseUrl + this.config.SAS_TOKEN;
         
@@ -278,13 +283,18 @@ class FloralBot {
                 method: 'PUT',
                 headers: {
                     'x-ms-blob-type': 'BlockBlob',
-                    'Content-Type': file.type
+                    'Content-Type': file.type,
+                    'x-ms-version': '2020-04-08',
+                    'Access-Control-Allow-Origin': '*'
                 },
-                body: file
+                body: file,
+                mode: 'cors'
             });
 
             if (!response.ok) {
                 const errorText = await response.text();
+                this.storageDebug.textContent += `\nResponse status: ${response.status}`;
+                this.storageDebug.textContent += `\nResponse text: ${errorText}`;
                 throw new Error(`Blob storage error (${response.status}): ${errorText}`);
             }
 
@@ -292,6 +302,12 @@ class FloralBot {
             return baseUrl; // Return URL without SAS token
         } catch (error) {
             this.storageDebug.textContent += '\nError uploading to blob storage: ' + error.message;
+            this.storageDebug.textContent += '\nFull error details:';
+            this.storageDebug.textContent += `\n- Error name: ${error.name}`;
+            this.storageDebug.textContent += `\n- Error message: ${error.message}`;
+            if (error.stack) {
+                this.storageDebug.textContent += `\n- Stack trace: ${error.stack}`;
+            }
             if (error.message.includes('404')) {
                 this.storageDebug.textContent += '\nPossible causes:\n- Container does not exist\n- Storage account name is incorrect';
             } else if (error.message.includes('403')) {
