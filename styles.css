@@ -166,4 +166,29 @@ main {
     font-size: 0.9em;
     max-height: 200px;
     overflow-y: auto;
+}
+
+.analyzed-image {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.result-image {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ai-description {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.ai-description p {
+    font-style: italic;
+    color: #666;
+    margin: 0;
 } 
