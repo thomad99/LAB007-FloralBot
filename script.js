@@ -172,21 +172,24 @@ class FloralBot {
         try {
             this.visionDebug.textContent = 'Sending request to Azure Vision API...';
             // First, analyze with general features
-            const response = await fetch(`${this.config.VISION_ENDPOINT}/vision/v3.2/analyze?${new URLSearchParams({
+            const params = new URLSearchParams({
                 'visualFeatures': 'Categories,Tags,Description,Objects,Color',
-                'details': 'Landmarks,Categories',
-                'language': 'en',
-                'model-version': 'latest'
-            })}`, {
+                'details': 'Landmarks',
+                'language': 'en'
+            });
+            
+            const response = await fetch(`${this.config.VISION_ENDPOINT}vision/v3.2/analyze?${params}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/octet-stream',
                     'Ocp-Apim-Subscription-Key': this.config.VISION_API_KEY
                 },
-                body: this.base64ToBlob(base64Image)
+                body: Uint8Array.from(atob(base64Image), c => c.charCodeAt(0))
             });
 
             if (!response.ok) {
+                const errorText = await response.text();
+                this.visionDebug.textContent = `API Error:\nStatus: ${response.status}\nResponse: ${errorText}`;
                 throw new Error(`API responded with status: ${response.status}`);
             }
 
