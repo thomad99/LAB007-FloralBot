@@ -9,39 +9,85 @@ class FloralBot {
         this.previewImage = document.getElementById('previewImage');
         this.flowerResults = document.getElementById('flowerResults');
 
-        // Get configuration from environment
-        this.storageAccount = process.env.STORAGE_ACCOUNT;
-        this.storageContainer = process.env.STORAGE_CONTAINER;
-        this.visionApiKey = process.env.VISION_API_KEY;
-        this.visionEndpoint = process.env.VISION_ENDPOINT;
+        // Initialize config as null, will be fetched from server
+        this.config = null;
+        this.loadConfig();
 
         this.initializeEventListeners();
     }
 
+    async loadConfig() {
+        try {
+            const response = await fetch('/config');
+            this.config = await response.json();
+        } catch (error) {
+            console.error('Error loading configuration:', error);
+        }
+    }
+
     initializeEventListeners() {
-        this.uploadBtn.addEventListener('click', () => this.fileInput.click());
-        this.fileInput.addEventListener('change', (e) => this.handleImageUpload(e));
-        this.cameraBtn.addEventListener('click', () => this.toggleCamera());
+        // Add click event for upload button
+        this.uploadBtn.addEventListener('click', () => {
+            this.fileInput.click();
+        });
+
+        // Add change event for file input
+        this.fileInput.addEventListener('change', async (e) => {
+            await this.handleImageUpload(e);
+        });
+
+        // Add click event for camera button
+        this.cameraBtn.addEventListener('click', async () => {
+            await this.toggleCamera();
+        });
+
+        // Add click event for canvas to capture photo
+        this.canvas.addEventListener('click', async () => {
+            if (!this.camera.classList.contains('hidden')) {
+                await this.capturePhoto();
+            }
+        });
+    }
+
+    async capturePhoto() {
+        const context = this.canvas.getContext('2d');
+        this.canvas.width = this.camera.videoWidth;
+        this.canvas.height = this.camera.videoHeight;
+        context.drawImage(this.camera, 0, 0, this.canvas.width, this.canvas.height);
+
+        // Convert canvas to blob
+        const blob = await new Promise(resolve => this.canvas.toBlob(resolve, 'image/jpeg'));
+        const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+
+        // Process the captured photo
+        await this.processImage(file);
+        
+        // Stop the camera
+        await this.toggleCamera();
+    }
+
+    async processImage(file) {
+        try {
+            // Upload to Azure Blob Storage
+            const blobName = `flower-${Date.now()}-${file.name}`;
+            const imageUrl = await this.uploadToBlob(file, blobName);
+            
+            this.previewImage.src = imageUrl;
+            this.resultsSection.classList.remove('hidden');
+            
+            // Analyze the image
+            const base64Image = await this.convertToBase64(file);
+            await this.analyzeImage(base64Image);
+        } catch (error) {
+            console.error('Error processing image:', error);
+            alert('Error processing image. Please try again.');
+        }
     }
 
     async handleImageUpload(event) {
         const file = event.target.files[0];
         if (file) {
-            try {
-                // Upload to Azure Blob Storage
-                const blobName = `flower-${Date.now()}-${file.name}`;
-                const imageUrl = await this.uploadToBlob(file, blobName);
-                
-                this.previewImage.src = imageUrl;
-                this.resultsSection.classList.remove('hidden');
-                
-                // Analyze the image
-                const base64Image = await this.convertToBase64(file);
-                await this.analyzeImage(base64Image);
-            } catch (error) {
-                console.error('Error handling image:', error);
-                alert('Error uploading image. Please try again.');
-            }
+            await this.processImage(file);
         }
     }
 
@@ -75,11 +121,11 @@ class FloralBot {
 
     async analyzeImage(base64Image) {
         try {
-            const response = await fetch(`${this.visionEndpoint}/vision/v3.2/analyze`, {
+            const response = await fetch(`${this.config.VISION_ENDPOINT}/vision/v3.2/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/octet-stream',
-                    'Ocp-Apim-Subscription-Key': this.visionApiKey
+                    'Ocp-Apim-Subscription-Key': this.config.VISION_API_KEY
                 },
                 body: this.base64ToBlob(base64Image),
                 params: {
@@ -170,7 +216,7 @@ class FloralBot {
     }
 
     async uploadToBlob(file, blobName) {
-        const blobUrl = `https://${this.storageAccount}.blob.core.windows.net/${this.storageContainer}/${blobName}${this.sasToken}`;
+        const blobUrl = `https://${this.config.STORAGE_ACCOUNT}.blob.core.windows.net/${this.config.STORAGE_CONTAINER}/${blobName}${this.config.SAS_TOKEN}`;
         
         await fetch(blobUrl, {
             method: 'PUT',
