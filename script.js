@@ -178,10 +178,12 @@ class FloralBot {
                     'Ocp-Apim-Subscription-Key': this.config.VISION_API_KEY
                 },
                 body: this.base64ToBlob(base64Image),
-                params: {
+                query: {
                     'visualFeatures': 'Objects,Color,Description,Tags',
                     'language': 'en',
-                    'model-version': 'latest'
+                    'model-version': 'latest',
+                    'detail': 'high',
+                    'description': 'This is an image of flowers. Please identify the types of flowers, count of each flower type, and their colors.'
                 }
             });
 
@@ -196,6 +198,7 @@ class FloralBot {
             const flowerAnalysis = {
                 flowers: [],
                 colors: data.color?.dominantColors || [],
+                description: data.description?.captions?.[0]?.text || '',
                 confidence: 0
             };
 
@@ -206,10 +209,27 @@ class FloralBot {
                         tag.name.includes('rose') || 
                         tag.name.includes('tulip') || 
                         tag.name.includes('daisy') ||
-                        tag.name.includes('lily')) {
+                        tag.name.includes('lily') ||
+                        tag.name.includes('orchid') ||
+                        tag.name.includes('sunflower') ||
+                        tag.name.includes('iris') ||
+                        tag.name.includes('peony')) {
                         flowerAnalysis.flowers.push({
                             type: tag.name,
                             confidence: tag.confidence
+                        });
+                    }
+                });
+            }
+
+            // Check objects for additional flower detections
+            if (data.objects) {
+                data.objects.forEach(obj => {
+                    if (obj.object.toLowerCase().includes('flower') ||
+                        obj.object.toLowerCase().includes('bouquet')) {
+                        flowerAnalysis.flowers.push({
+                            type: obj.object,
+                            confidence: obj.confidence
                         });
                     }
                 });
@@ -236,15 +256,47 @@ class FloralBot {
     displayResults(analysis) {
         let resultsHtml = '<div class="analysis-details">';
         
+        // Display the uploaded image
+        resultsHtml += `
+            <div class="analyzed-image">
+                <h4>Analyzed Image:</h4>
+                <img src="${this.previewImage.src}" alt="Analyzed flower image" class="result-image">
+            </div>
+        `;
+
+        // Display AI description
+        if (analysis.description) {
+            resultsHtml += `
+                <div class="ai-description">
+                    <h4>AI Description:</h4>
+                    <p>${analysis.description}</p>
+                </div>
+            `;
+        }
+        
         // Display detected flowers
         if (analysis.flowers.length > 0) {
             resultsHtml += '<h4>Detected Flowers:</h4><ul>';
-            analysis.flowers.forEach(flower => {
+            // Group similar flowers and count them
+            const flowerCounts = analysis.flowers.reduce((acc, flower) => {
+                const type = flower.type.toLowerCase();
+                if (!acc[type]) {
+                    acc[type] = { count: 1, confidence: flower.confidence };
+                } else {
+                    acc[type].count++;
+                    acc[type].confidence = Math.max(acc[type].confidence, flower.confidence);
+                }
+                return acc;
+            }, {});
+
+            Object.entries(flowerCounts).forEach(([type, data]) => {
                 resultsHtml += `
                     <li>
-                        <strong>Type:</strong> ${flower.type.charAt(0).toUpperCase() + flower.type.slice(1)}
+                        <strong>Type:</strong> ${type.charAt(0).toUpperCase() + type.slice(1)}
                         <br>
-                        <strong>Confidence:</strong> ${(flower.confidence * 100).toFixed(1)}%
+                        <strong>Count:</strong> ${data.count}
+                        <br>
+                        <strong>Confidence:</strong> ${(data.confidence * 100).toFixed(1)}%
                     </li>
                 `;
             });
